@@ -1,0 +1,23 @@
+services:
+  backend:
+    build: ./backend
+    command: sh -c "npm install && npm run start:dev"
+    ports: ["3000:3000"]
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+
+  frontend:
+    build: ./frontend
+    command: sh -c "npm install && npm run dev"
+    environment:
+      API_URL: http://backend:3000
+    ports: ["5000:5173"]
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on: [backend]
+
+volumes:
+  backend_node_modules:
+  frontend_node_modules:
