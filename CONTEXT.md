@@ -1,286 +1,352 @@
-## Project context
+## 1. Overview
 
-**Stack:** NestJS, React, Vitest  
-**Product:** A portfolio dashboard for tracking stocks and cryptocurrencies, manually recording transactions, viewing holdings and performance, and reviewing record-level change history.
+The application is a portfolio management dashboard that allows users to track investments, record buy and sell transactions, monitor portfolio performance, and review changes made to important records.
 
-**MVP assumption:** Buy/sell transactions are recorded in the application; the app does not execute real orders through a broker or exchange.
+The MVP should focus on reliable portfolio tracking and a clear audit trail. Unless a brokerage integration is explicitly added, buy and sell actions in the MVP are **portfolio records only**; they do not execute real orders on an exchange or with a broker.
 
-## Working principles
+## 2. Technology Stack
 
-- Each person owns one vertical feature area, including the relevant frontend/backend work where practical.
-- Shared API contracts and data models are agreed early.
-- Every feature should include tests, error states, and a short demo path.
-- Integrate continuously; do not wait until the end to merge work.
-- DevOps ownership includes developer experience, CI, deployment, and observability—not only initial setup.
+- **Backend:** NestJS
+- **Frontend:** React
+- **Testing:** Vitest
+- **Market data:** External market-data APIs behind a provider abstraction
+- **API style:** REST for the MVP; WebSockets can be considered later for live updates
 
----
+Database, ORM, authentication provider, deployment platform, and charting library are still to be selected.
 
-## Person 1 — Portfolio Dashboard & Analytics
+## 3. Product Goals
 
-**Primary focus:** Frontend, with a small backend aggregation component.
+- Give users a single dashboard for their investment portfolio.
+- Track holdings and transaction history.
+- Display current or latest available market prices.
+- Calculate portfolio value and basic profit/loss metrics.
+- Support manual recording of buy and sell transactions.
+- Maintain an audit log showing who changed what and when.
+- Keep market-data providers replaceable so the application is not tightly coupled to one API.
 
-### Frontend
-- Portfolio overview page.
-- Summary cards: total portfolio value, cost basis, unrealized P/L, and realized P/L where supported.
-- Asset allocation chart.
-- Holdings table with quantity, latest price, market value, and P/L.
-- Loading, empty, error, and stale-price states.
-- Base-currency display and basic sorting.
+## 4. MVP Scope
 
-### Backend
-- `GET /api/portfolios/:id/dashboard`
-- Aggregate portfolio totals and allocation from holdings, transactions, and available market prices.
-- Agree with the team on calculation rules and response DTOs.
+### 4.1 Portfolio Dashboard
 
-### Tests
-- Dashboard component states.
-- Unit tests for aggregation and allocation calculations.
-- Test missing quotes and empty portfolios.
+The dashboard should display:
 
-### Definition of done
-- A user can open a portfolio and understand its value, allocation, and current holdings.
-- Values are labelled with their currency and quote freshness.
-- Core calculations are covered by tests.
+- Total portfolio value in the selected base currency.
+- Total cost basis, where supported by the chosen accounting method.
+- Unrealized profit/loss and percentage return.
+- Realized profit/loss from completed sell transactions, where supported.
+- Allocation by asset and asset class.
+- Holdings table with quantity, latest price, market value, and profit/loss.
+- Recent transactions.
+- Last market-data refresh time and data freshness status.
 
-**Estimated effort:** Medium–high.
+Calculations must clearly distinguish realized from unrealized profit/loss. The initial version should document its cost-basis method (for example, average cost or FIFO) and apply it consistently.
 
----
+### 4.2 Portfolio and Holdings
 
-## Person 2 — Portfolio, Assets & Holdings
+Users should be able to:
 
-**Primary focus:** Backend domain and supporting frontend screens.
+- Create and manage a portfolio.
+- Add supported assets to a watchlist or portfolio.
+- View holdings and transaction history.
+- Record an asset purchase or sale manually.
+- Enter quantity, unit price, transaction date, fees, and optional notes.
+- Edit or delete a transaction subject to audit-log rules.
+- Filter and sort holdings and transactions.
 
-### Backend
-- `PortfoliosModule` and `AssetsModule`.
-- Create, list, and view portfolios.
-- Asset search and supported asset metadata.
-- Add/remove an asset from a watchlist or portfolio, depending on the final domain model.
-- Ownership and authorization checks.
-- Suggested endpoints:
-  - `GET /api/portfolios`
-  - `POST /api/portfolios`
-  - `GET /api/portfolios/:id`
-  - `GET /api/assets/search?q=BTC`
-  - `GET /api/portfolios/:id/holdings`
+Validation should prevent invalid quantities and malformed prices. The application should define how it handles selling more units than are currently held.
 
-### Frontend
-- Portfolio list and portfolio creation form.
-- Asset search/select interface.
-- Holdings list or asset detail panel.
-- Empty states and form validation.
+### 4.3 Market Data
 
-### Tests
-- Portfolio CRUD and validation.
-- Asset search response mapping.
-- Access denial when a user requests another user's portfolio.
+The backend should retrieve market prices from external providers and expose a normalized internal format to the frontend.
 
-### Definition of done
-- A user can create and select a portfolio, search supported assets, and see its holdings.
-- Users cannot access portfolios they do not own.
+Potential providers:
 
-**Estimated effort:** Medium–high.
+- **CoinGecko API** — aggregated cryptocurrency prices and historical market data. Documentation: https://docs.coingecko.com/
+- **Binance Spot Market Data API** — exchange-specific cryptocurrency prices, ticker data, and candlesticks. Public market-data endpoints are available without API authentication. Documentation: https://developers.binance.com/docs/binance-spot-api-docs
+- **Twelve Data** — potential option for equities, ETFs, forex, and crypto, depending on plan and licensing. Documentation: https://twelvedata.com/docs
+- **Finnhub** — potential option for equities and other market data, subject to its plan and terms. Documentation: https://finnhub.io/docs/api
 
----
+These are candidates, not a commitment to use every provider. Before launch, verify current rate limits, historical-data availability, attribution requirements, and commercial/display licensing. A free developer plan does not automatically grant unrestricted commercial use.
 
-## Person 3 — Transactions & Record-Level Audit History
+#### Market-data implementation guidelines
 
-**Primary focus:** Backend transactions and audit logging, with a frontend history view.
+- Keep API keys on the server; never expose secret keys in React.
+- Implement a `MarketDataProvider` interface so providers can be swapped.
+- Normalize symbols, timestamps, currency codes, and price precision.
+- Cache prices and avoid making one external request per dashboard component.
+- Respect provider rate limits and retry transient failures with backoff.
+- Store the provider and timestamp associated with each price.
+- Show a stale-data indicator if the last refresh is too old.
+- Do not treat a missing quote as a zero price.
+- Use decimal-safe arithmetic for monetary values; avoid JavaScript floating-point arithmetic for financial calculations.
 
-### Backend
-- `TransactionsModule` and `AuditLogModule`.
-- Record manual `BUY` and `SELL` transactions.
-- Validate quantity, unit price, currency, fees, and transaction date.
-- Edit and soft-delete transactions.
-- Record who changed what and when.
-- Store field-level before/after values for tracked changes.
-- Write the business change and audit event in the same database transaction where possible.
-- Suggested endpoints:
-  - `GET /api/portfolios/:id/transactions`
-  - `POST /api/portfolios/:id/transactions`
-  - `PATCH /api/transactions/:id`
-  - `DELETE /api/transactions/:id`
-  - `GET /api/transactions/:id/history`
+### 4.4 Transactions
 
-### Frontend
-- Transaction list and manual buy/sell form.
-- Edit/delete actions.
-- Record history timeline showing actor, timestamp, action, and before/after values.
+Supported MVP transaction types:
 
-### Tests
-- Transaction validation and CRUD.
-- Audit event creation for create/update/delete.
-- Before/after diff generation.
-- Audit history authorization and sensitive-field redaction.
+- `BUY`
+- `SELL`
+- Optionally `DEPOSIT`, `WITHDRAWAL`, `FEE`, or `DIVIDEND` if required by the product scope.
 
-### Definition of done
-- A user can record and edit transactions.
-- Each tracked change produces an audit entry.
-- A user can open a transaction and inspect its history.
-- Ordinary users cannot edit or delete audit entries.
+A transaction should include:
 
-**Estimated effort:** High; this is a core feature and deserves a clear owner.
+- ID
+- Portfolio ID
+- Asset ID
+- Transaction type
+- Quantity
+- Unit price
+- Fee and fee currency
+- Transaction currency
+- Transaction date/time
+- Notes
+- Created by / created at
+- Updated by / updated at
 
----
+The application should not silently rewrite historical transactions when a user edits them. Each change must be auditable.
 
-## Person 4 — Market Data Integration & Asset Price Views
+### 4.5 Audit Log — History of Changes
 
-**Primary focus:** Backend integration, with a small frontend price/asset detail view.
+**Requirement:** Record who changed what and when, with a record-level history view.
 
-### Backend
-- `MarketDataModule`.
-- Define a provider interface so the provider can be replaced without changing the rest of the application.
-- Integrate one provider first (for example, CoinGecko for aggregated crypto prices or Binance public market data).
-- Normalize asset symbols, currencies, timestamps, and prices.
-- Cache quotes and respect rate limits.
-- Handle provider errors, missing quotes, and stale data.
-- Keep credentials server-side; never expose secret API keys in React.
-- Suggested endpoints:
-  - `GET /api/assets/:id/price`
-  - Optional: `GET /api/assets/:id/history?range=7d`
+The audit log should capture:
 
-### Frontend
-- Asset detail panel with latest price and, if included, a simple historical chart.
-- Last-updated timestamp and stale-data indicator.
-- Friendly error state when a quote is unavailable.
+- Actor/user who performed the action.
+- Action type: `CREATE`, `UPDATE`, or `DELETE`.
+- Entity type and entity ID.
+- Timestamp in UTC.
+- Changed fields, where applicable.
+- Previous and new values for changed fields, excluding secrets and sensitive data.
+- Optional reason or comment.
+- Request/correlation ID for troubleshooting, if available.
 
-### Tests
-- Provider response normalization.
-- Cache behavior and rate-limit handling.
-- Missing quote and provider failure cases.
-- Mock all external API calls in automated tests.
+#### Audit-log behavior
 
-### Definition of done
-- The app can retrieve and display a quote from one real provider.
-- The UI makes data freshness clear.
-- Provider failure does not break the whole dashboard.
+- Create an audit entry when a tracked record is created, updated, or deleted.
+- Record the audit entry in the same database transaction as the business change where possible.
+- Do not allow normal users to edit or delete audit entries.
+- Apply authorization checks to audit history.
+- Avoid recording passwords, API secrets, access tokens, or other sensitive values.
+- Use soft deletion or a retained snapshot where necessary so a deleted record's history remains accessible.
+- Define a retention policy appropriate to the product and applicable legal requirements.
 
-**Estimated effort:** Medium–high.
+#### Example: Record history view
 
----
+**Transaction #TX-1042**
 
-## Person 5 — DevOps, Quality & Application Foundation
+| Date (UTC) | User | Action | Change |
+|---|---|---|---|
+| 2026-10-24 08:15:00 | alex@example.com | Created | BUY 0.25 BTC at 65,000 USD |
+| 2026-10-24 08:22:10 | alex@example.com | Updated | Fee changed from 2 USD to 3 USD |
+| 2026-10-24 08:30:45 | sam@example.com | Updated | Notes changed from empty to "Long-term holding" |
 
-**Primary focus:** DevOps and integration, with a bounded application feature.
+The interface should allow a user to open a record and inspect its chronological history, including field-level before/after values when permitted.
 
-### DevOps / platform
-- Docker setup for local development.
-- Environment variable and secret-management conventions.
-- CI pipeline for linting, type-checking, tests, and builds.
-- Database migration workflow.
-- Development/staging deployment.
-- Health endpoint and basic structured logging.
-- Error reporting and basic dependency health checks.
-- README with local setup and troubleshooting instructions.
+## 5. Suggested Architecture
 
-### Application feature
-- `HealthModule` and `GET /api/health`.
-- Basic account settings or profile page, if authentication is included in the MVP.
-- Global API error handling and request validation conventions.
-- Shared frontend/backend conventions: formatting, linting, environment configuration, and API error shape.
+### Backend modules (NestJS)
 
-### Tests
-- CI runs the required test suite.
-- Health endpoint tests.
-- Smoke test for the deployed app.
-- Verify the application starts with documented environment variables.
+- `AuthModule` — authentication and authorization.
+- `UsersModule` — user profile and account settings.
+- `PortfoliosModule` — portfolio CRUD and access rules.
+- `AssetsModule` — asset metadata and supported symbols.
+- `TransactionsModule` — buys, sells, fees, and transaction validation.
+- `MarketDataModule` — provider adapters, caching, normalization, and refresh jobs.
+- `DashboardModule` — aggregated portfolio metrics for the UI.
+- `AuditLogModule` — append-only audit events and record history.
+- `HealthModule` — application and dependency health checks.
 
-### Definition of done
-- A new team member can run the app using the README.
-- CI blocks broken builds.
-- The application is deployed to a shared environment.
-- Health checks and logs help the team diagnose failures.
-- The person also owns a demonstrable application feature, not only infrastructure.
+### Frontend areas (React)
 
-**Estimated effort:** Medium–high, with work spread across the project.
+- Login / account screens.
+- Portfolio overview dashboard.
+- Holdings and allocation views.
+- Transaction list and transaction form.
+- Asset search and watchlist.
+- Record detail page with history/audit timeline.
+- Settings, base currency, and account preferences.
 
----
+### High-level flow
 
-## Shared integration contracts
+1. React requests dashboard and portfolio data from the NestJS API.
+2. NestJS reads portfolio and transaction data from the database.
+3. `MarketDataModule` obtains cached or refreshed quotes from the configured provider.
+4. The backend calculates portfolio metrics and returns a normalized response.
+5. When a user changes a record, the business update and audit event are persisted.
+6. React refreshes the relevant view and can display the updated history.
 
-Agree on these before implementation:
+## 6. Suggested Data Model
 
-### Core entities
-- `User`
-- `Portfolio`
-- `Asset`
-- `Transaction`
-- `MarketPrice`
-- `AuditLog`
+The following is a starting point and should be adjusted after choosing the database and ORM.
 
-### Suggested API conventions
-- Prefix routes with `/api`.
-- Use DTOs for request validation and response contracts.
-- Store timestamps in UTC and serialize them consistently.
-- Use database decimal/numeric types for prices and quantities; define rounding rules.
-- Standardize pagination, error responses, and authorization checks.
-- Never expose provider secrets to the frontend.
+### `User`
 
-### Suggested ownership map
+- `id`
+- `email`
+- `displayName`
+- `createdAt`
+- `updatedAt`
 
-| Area | Owner | Collaborators |
+### `Portfolio`
+
+- `id`
+- `userId`
+- `name`
+- `baseCurrency` (for example, `USD`, `EUR`, or `PLN`)
+- `createdAt`
+- `updatedAt`
+
+### `Asset`
+
+- `id`
+- `symbol` (for example, `BTC` or `AAPL`)
+- `name`
+- `assetType` (for example, `CRYPTO`, `STOCK`, or `ETF`)
+- `marketDataProvider`
+- `providerAssetId` or provider-specific symbol
+- `createdAt`
+- `updatedAt`
+
+### `Transaction`
+
+- `id`
+- `portfolioId`
+- `assetId`
+- `type`
+- `quantity`
+- `unitPrice`
+- `currency`
+- `fee`
+- `feeCurrency`
+- `occurredAt`
+- `notes`
+- `createdBy`
+- `createdAt`
+- `updatedBy`
+- `updatedAt`
+- `deletedAt` (nullable, if soft deletion is used)
+
+### `MarketPrice`
+
+- `id`
+- `assetId`
+- `price`
+- `currency`
+- `provider`
+- `observedAt`
+- `fetchedAt`
+
+### `AuditLog`
+
+- `id`
+- `actorUserId`
+- `action`
+- `entityType`
+- `entityId`
+- `occurredAt`
+- `changes` (structured before/after values)
+- `reason` (optional)
+- `correlationId` (optional)
+
+Use database decimal/numeric types for quantities and prices where appropriate. Define precision and rounding rules explicitly.
+
+## 7. Example REST API
+
+Route names are illustrative and can be revised during implementation.
+
+| Method | Endpoint | Purpose |
 |---|---|---|
-| Dashboard and analytics | Person 1 | Persons 2 and 4 |
-| Portfolios and assets | Person 2 | Persons 1 and 4 |
-| Transactions and audit history | Person 3 | Persons 1 and 2 |
-| Market data | Person 4 | Persons 1 and 2 |
-| DevOps and app foundation | Person 5 | Everyone |
+| `GET` | `/api/portfolios` | List the current user's portfolios |
+| `POST` | `/api/portfolios` | Create a portfolio |
+| `GET` | `/api/portfolios/:id` | Get portfolio details |
+| `GET` | `/api/portfolios/:id/dashboard` | Get portfolio metrics and allocation |
+| `GET` | `/api/portfolios/:id/holdings` | List holdings with latest available prices |
+| `GET` | `/api/portfolios/:id/transactions` | List transactions |
+| `POST` | `/api/portfolios/:id/transactions` | Record a buy or sell |
+| `PATCH` | `/api/transactions/:id` | Update a transaction |
+| `DELETE` | `/api/transactions/:id` | Delete/soft-delete a transaction |
+| `GET` | `/api/transactions/:id/history` | Get the transaction's audit history |
+| `GET` | `/api/assets/search?q=BTC` | Search supported assets |
+| `GET` | `/api/assets/:id/price` | Get the latest available quote |
 
-Owners are responsible for implementation and tests in their area. Collaborators should agree on contracts rather than duplicate ownership.
+All endpoints that access user-owned data must enforce authentication and ownership/authorization checks.
 
----
+## 8. Testing Strategy
 
-## Suggested milestones
+Use **Vitest** for unit and integration tests where compatible with the selected NestJS setup. Confirm the NestJS test configuration and tooling before standardizing the test runner.
 
-### Milestone 1 — Foundation and contracts
-- Agree on data model, database, ORM, authentication assumptions, and API response shapes.
-- Person 5 establishes local development, CI, and deployment basics.
-- All owners create feature skeletons and agree on DTOs.
+### Unit tests
 
-### Milestone 2 — End-to-end vertical slices
-- Person 2 delivers portfolio creation and listing.
-- Person 3 delivers transaction creation plus audit history.
-- Person 4 delivers a quote from one provider.
-- Person 1 delivers the first dashboard using agreed response contracts.
-- Person 5 ensures CI and the shared environment work.
+- Portfolio valuation and allocation calculations.
+- Realized/unrealized profit and loss calculations.
+- Transaction validation and sell constraints.
+- Currency and decimal rounding behavior.
+- Market-data response normalization.
+- Audit-diff generation and sensitive-field redaction.
 
-### Milestone 3 — Integration and polish
-- Connect dashboard calculations to real holdings and quotes.
-- Add edit/delete flows, empty/error/loading states, and authorization checks.
-- Add integration tests and fix cross-feature issues.
+### Integration tests
 
-### Milestone 4 — Demo readiness
-- Deploy the MVP.
-- Run through a scripted demo.
-- Verify README setup, environment variables, tests, and known limitations.
-- Prepare a short list of out-of-scope features.
+- Create, update, and delete a transaction.
+- Verify the matching audit entry is created.
+- Verify the audit entry is persisted atomically with the business change.
+- Verify one user cannot access another user's portfolio or audit history.
+- Verify provider errors, rate limits, stale data, and missing quotes are handled gracefully.
 
----
+### Frontend tests
 
-## Suggested demo scenario
+- Dashboard loading, empty, error, and stale-data states.
+- Holdings and transaction rendering.
+- Transaction form validation.
+- Audit history timeline and before/after values.
+- Access-controlled views.
 
-1. Create a portfolio with a base currency.
-2. Search for and add a supported asset.
-3. Record a buy transaction.
-4. Show the transaction and corresponding audit history.
-5. Fetch a market quote and show the updated holding value on the dashboard.
-6. Edit the transaction and demonstrate the before/after history.
-7. Show the stale-data or provider-error state using a mocked failure.
-8. Run the test suite and show the CI result.
+Use mocked market-data responses in automated tests so the test suite is deterministic and does not depend on external API availability.
 
-## Fairness notes
+## 9. MVP Acceptance Criteria
 
-- Person 3 has a relatively complex domain feature; avoid assigning them extra unrelated backend work.
-- Person 5 should contribute throughout the project and own a small application feature so their contribution is visible.
-- Persons 1 and 4 should coordinate early on dashboard DTOs and quote freshness.
-- Each person should have at least one testable backend, frontend, or platform deliverable.
-- Reassess scope after the first milestone. If the schedule is short, remove optional price history, watchlists, and advanced P/L calculations before cutting tests or audit history.
+The MVP is ready for review when:
 
-## Decisions to confirm as a team
+- A user can create and view a portfolio.
+- A user can manually record, update, and remove a buy/sell transaction.
+- The application displays holdings and portfolio value using available quotes.
+- The dashboard distinguishes data freshness and missing prices.
+- Portfolio calculations follow documented cost-basis and currency rules.
+- Every tracked create/update/delete operation produces an audit entry.
+- A user can view the change history of an individual record.
+- Audit history is protected from unauthorized access and normal-user modification.
+- Automated tests cover core calculations, transaction flows, authorization, and audit logging.
+- Market-data credentials are stored server-side and provider limits are respected.
 
-- Will the MVP support crypto only, stocks only, or both?
+## 10. Out of Scope for the Initial MVP
+
+Unless specifically agreed otherwise, the first release does not include:
+
+- Executing real trades through a broker or exchange.
+- Custody of user funds or private keys.
+- Automated tax reporting.
+- Advanced options, futures, margin, or leveraged trading.
+- Guaranteed real-time market quotes.
+- Full accounting for every corporate action.
+- Multi-provider failover and enterprise-level market-data SLAs.
+
+## 11. Suggested Implementation Order
+
+1. Confirm product scope, supported asset classes, currencies, and cost-basis method.
+2. Set up NestJS, React, Vitest, database, migrations, and authentication.
+3. Implement portfolios, assets, and transaction CRUD.
+4. Implement audit logging and record-level history early, before adding more mutation flows.
+5. Add a market-data provider adapter and caching.
+6. Implement portfolio calculations and dashboard endpoints.
+7. Build dashboard, holdings, transaction forms, and history UI.
+8. Add automated tests, authorization checks, rate-limit handling, and deployment monitoring.
+
+## 12. Open Decisions
+
 - Which database and ORM will be used?
-- Is authentication in scope, and which approach will be used?
+- Will the first release support crypto only, stocks only, or both?
+- Is this a manual portfolio tracker, or must it execute trades through a broker/exchange?
 - Which base currencies are required?
-- Which cost-basis method will be used for profit/loss?
-- Is price history required, or is the latest quote enough?
-- Where will the application be deployed?
+- Which cost-basis method should be used?
+- Is the product personal/internal, or intended for public commercial use?
+- What are the expected refresh frequency and data freshness requirements?
+- Which authentication and deployment providers will be used?
