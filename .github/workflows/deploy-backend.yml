@@ -44,6 +44,11 @@ jobs:
       - name: Test
         run: pnpm run test
 
+      - name: Run database migrations
+        run: pnpm exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
 
