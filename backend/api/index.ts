@@ -10,7 +10,9 @@ async function getApp(): Promise<Express> {
   if (cachedApp) return cachedApp;
 
   const server = express();
-  const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
+  const app = await NestFactory.create(AppModule, new ExpressAdapter(server), {
+    bodyParser: false,
+  });
   app.setGlobalPrefix('api');
   app.enableCors();
   await app.init();
