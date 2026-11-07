@@ -1,2 +1,20 @@
 node_modules
 dist
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# AI tool and editor config (local to each developer)
+.claude/
+.windsurf/
+.cursor/
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# Tool output
+coverage
+.pnpm-store
+*.tsbuildinfo

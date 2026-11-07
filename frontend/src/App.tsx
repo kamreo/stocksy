@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react'
+import { Route, Routes } from 'react-router'
+import AuthForm from './AuthForm.tsx'
+import Home from './Home.tsx'
+import RequireAuth from './RequireAuth.tsx'
 
 function App() {
-  const [message, setMessage] = useState('...')
-
-  useEffect(() => {
-    fetch('/api')
-      .then((res) => res.text())
-      .then(setMessage)
-      .catch(() => setMessage('backend unreachable'))
-  }, [])
-
-  return <h1>{message}</h1>
+  return (
+    <Routes>
+      <Route path="/login" element={<AuthForm mode="login" />} />
+      <Route path="/register" element={<AuthForm mode="register" />} />
+      <Route element={<RequireAuth />}>
+        <Route path="/" element={<Home />} />
+      </Route>
+    </Routes>
+  )
 }
 
 export default App

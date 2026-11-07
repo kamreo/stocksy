@@ -3,3 +3,14 @@ node_modules
 .env
 
 /src/generated/prisma
+.env.*
+!.env.example
+
+# Build and tool output
+dist
+coverage
+*.tsbuildinfo
+.pnpm-store
+
+*.log
+.DS_Store
