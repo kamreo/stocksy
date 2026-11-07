@@ -14,9 +14,12 @@ services:
 
   backend:
     build: ./backend
-    command: sh -c "pnpm install && pnpm exec prisma generate && pnpm exec prisma db push && pnpm start:dev"
+    command: sh -c "pnpm install && pnpm exec prisma generate && pnpm exec prisma migrate deploy && pnpm start:dev"
     environment:
       DATABASE_URL: postgresql://stocksy:stocksy@db:5432/stocksy
+      # Dev-only values. BETTER_AUTH_URL is the origin the browser uses (the frontend).
+      BETTER_AUTH_SECRET: dev-only-secret-change-me-0123456789
+      BETTER_AUTH_URL: http://localhost:5000
     ports: ["3000:3000"]
     volumes:
       - ./backend:/app
