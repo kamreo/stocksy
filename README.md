@@ -23,3 +23,16 @@ Backend environment variables:
 | `BETTER_AUTH_URL` | Public origin the browser uses, i.e. the frontend (it proxies `/api` to the backend) |
 
 `docker-compose.yml` sets dev-only values. Tests: `pnpm test` (unit) and `pnpm test:e2e` (needs a disposable Postgres in `DATABASE_URL` with migrations applied).
+
+## Workspace
+
+This is a pnpm workspace (`backend`, `frontend`) with one lockfile at the root. Run from the repo root:
+
+```
+pnpm install               # installs both apps
+pnpm lint | test | build   # runs the script in every package
+pnpm dev:backend           # or dev:frontend
+pnpm --filter backend add <package>   # add a dependency to one app
+```
+
+The pnpm version is pinned in the root `package.json` (`packageManager`).

@@ -6,7 +6,6 @@
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
-  "packageManager": "pnpm@9.15.9",
   "scripts": {
     "postinstall": "prisma generate",
     "build": "nest build",
