@@ -7,6 +7,10 @@
     {
       "source": "/api",
       "destination": "https://stocksy-backend-kamreos-projects.vercel.app/api"
+    },
+    {
+      "source": "/((?!api/.*).*)",
+      "destination": "/index.html"
     }
   ]
 }
