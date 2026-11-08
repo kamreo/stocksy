@@ -3,6 +3,7 @@ import { AuthModule } from '@thallesp/nestjs-better-auth';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { createAuth } from './auth.js';
+import { MarketDataModule } from './market-data/market-data.module.js';
 import { PrismaModule } from './prisma.module.js';
 import { PrismaService } from './prisma.service.js';
 
@@ -13,6 +14,7 @@ import { PrismaService } from './prisma.service.js';
       inject: [PrismaService],
       useFactory: (prisma: PrismaService) => ({ auth: createAuth(prisma) }),
     }),
+    MarketDataModule,
   ],
   controllers: [AppController],
   providers: [AppService],

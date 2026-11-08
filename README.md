@@ -24,6 +24,14 @@ Backend environment variables:
 
 `docker-compose.yml` sets dev-only values. Tests: `pnpm test` (unit) and `pnpm test:e2e` (needs a disposable Postgres in `DATABASE_URL` with migrations applied).
 
+## Bitcoin market data
+
+The authenticated `GET /api/market-data/bitcoin` endpoint returns BTC/USDT data from Binance Spot: the latest quote and 24 hourly OHLCV candles. The backend fetches Binance's public klines endpoint at startup when no cache exists or its daily refresh is due, then refreshes every 24 hours. The JSON cache is written to `backend/data/bitcoin-quote.json` (override with `MARKET_DATA_CACHE_FILE`).
+
+Binance's public market-data endpoint does not require an API key, so do not create or configure a Binance token for this feature. `BETTER_AUTH_SECRET` is a separate application secret used to sign authentication sessions and must be set to a unique, secure value in production.
+
+The daily timer and JSON file are a proof of concept for a running backend process, such as Docker. Vercel serverless functions do not guarantee long-running timers or durable local-file writes; use persistent storage and a scheduled invocation when adding production caching.
+
 ## Workspace
 
 This is a pnpm workspace (`backend`, `frontend`) with one lockfile at the root. Run from the repo root:
