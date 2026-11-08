@@ -13,33 +13,32 @@ services:
       retries: 10
 
   backend:
-    build: ./backend
-    command: sh -c "pnpm install && pnpm exec prisma generate && pnpm exec prisma migrate deploy && pnpm start:dev"
+    build: { context: ., dockerfile: docker/Dockerfile }
     environment:
       DATABASE_URL: postgresql://stocksy:stocksy@db:5432/stocksy
-      # Dev-only values. BETTER_AUTH_URL is the origin the browser uses (the frontend).
       BETTER_AUTH_SECRET: dev-only-secret-change-me-0123456789
       BETTER_AUTH_URL: http://localhost:5000
-    ports: ["3000:3000"]
+    command: sh -c "pnpm exec prisma generate && pnpm exec prisma migrate deploy && pnpm start:dev"
+    working_dir: /app/backend
     volumes:
-      - ./backend:/app
-      - backend_node_modules:/app/node_modules
+      - ./backend/src:/app/backend/src
+      - ./backend/prisma:/app/backend/prisma
+    ports: ["3000:3000"]
     depends_on:
       db:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
-    command: sh -c "pnpm install && pnpm dev"
+    build: { context: ., dockerfile: docker/Dockerfile }
     environment:
       API_URL: http://backend:3000
-    ports: ["5000:5173"]
+    command: pnpm dev
+    working_dir: /app/frontend
     volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
+      - ./frontend/src:/app/frontend/src
+      - ./frontend/index.html:/app/frontend/index.html
+    ports: ["5000:5173"]
     depends_on: [backend]
 
 volumes:
   pgdata:
-  backend_node_modules:
-  frontend_node_modules:
