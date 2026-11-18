@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { authClient } from './auth-client.ts'
 import Logo from './Logo.tsx'
 
@@ -36,6 +37,7 @@ export default function Home() {
         <p className="mt-2 text-slate-600 dark:text-slate-400">
           Signed in as {data?.user.email}. Your portfolio will show up here.
         </p>
+        <Link to="/portfolios" className="mt-4 inline-block font-medium text-emerald-700 underline dark:text-emerald-400">Portfolios</Link>
         <section className="mt-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <h2 className="text-sm font-medium text-slate-600 dark:text-slate-400">Backend status</h2>
           <p className="mt-1 text-lg font-medium">{message}</p>
